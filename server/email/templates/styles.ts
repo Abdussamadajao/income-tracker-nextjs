@@ -1,0 +1,71 @@
+export const styles = {
+    main: {
+        backgroundColor: '#ffffff',
+        fontFamily:
+            '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
+    },
+    container: {
+        margin: '0 auto',
+        padding: '20px 0 48px',
+        maxWidth: '560px',
+    },
+    logo: {
+        display: 'block',
+        margin: '0 auto',
+        width: '80px',
+        height: '80px',
+        objectFit: 'contain' as const,
+        objectPosition: 'center' as const,
+    },
+    button: {
+        backgroundColor: '#1A1AFF',
+        borderRadius: '3px',
+        color: '#fff',
+        fontSize: '16px',
+        textDecoration: 'none',
+        textAlign: 'center' as const,
+        display: 'block',
+        padding: '12px 20px',
+        margin: '32px auto',
+        maxWidth: '200px',
+    },
+    paragraph: {
+        fontSize: '16px',
+        lineHeight: '26px',
+        color: '#3c4043',
+    },
+    hr: {
+        borderColor: '#e8eaed',
+        margin: '20px 0',
+    },
+    footer: {
+        color: '#8898aa',
+        fontSize: '12px',
+        lineHeight: '16px',
+        textAlign: 'center' as const,
+    },
+    heading: {
+        fontSize: '24px',
+        fontWeight: 'normal',
+        textAlign: 'center' as const,
+        color: '#1A1AFF',
+    },
+    otp: {
+        fontSize: '32px',
+        fontWeight: 'bold',
+        textAlign: 'center' as const,
+        letterSpacing: '0.5em',
+        color: '#1A1AFF',
+        margin: '32px auto',
+        padding: '20px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px',
+        maxWidth: '300px',
+    },
+    grayText: {
+        fontSize: '14px',
+        color: '#666',
+        textAlign: 'center' as const,
+        marginBottom: '16px',
+    },
+};
