@@ -27,7 +27,7 @@ export const schema = {
       role: {
         type: "string",
         required: false,
-        defaultValue: "user",
+        defaultValue: "USER",
         // Never let a client set/change their own role via update-user —
         // only the DB / an internal script should be able to promote
         // someone to admin.
