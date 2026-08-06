@@ -15,6 +15,7 @@
     "@react-email/components": "^1.0.12",
     "better-auth": "^1.6.26",
     "bullmq": "^6.0.8",
+    "expo-server-sdk": "^7.0.0",
     "luxon": "^3.7.2",
     "next": "16.3.0",
     "nodemailer": "^9.0.4",
