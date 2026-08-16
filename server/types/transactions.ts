@@ -11,6 +11,10 @@ export interface CreateTransactionBody {
   receipt_url?: string;
   tag?: TransactionTag;
   recorded_at: string;
+  // Budget fields (only for EXPENSE transactions)
+  budget_amount?: number;
+  budget_period?: "WEEKLY" | "MONTHLY" | "YEARLY";
+  budget_start_date?: string;
 }
 
 export interface CreateTransactionsBatchBody {

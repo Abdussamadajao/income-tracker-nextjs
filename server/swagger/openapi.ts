@@ -1557,6 +1557,11 @@ export function getApiDocs(): OpenAPIV3.Document {
               nullable: true,
               allOf: [{ $ref: "#/components/schemas/CategoryBrief" }],
             },
+            income_id: { type: "string", nullable: true },
+            income: {
+              nullable: true,
+              allOf: [{ $ref: "#/components/schemas/TransactionBrief" }],
+            },
             amount: { type: "number", format: "double" },
             period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
             start_date: { type: "string", format: "date-time" },
@@ -1589,6 +1594,12 @@ export function getApiDocs(): OpenAPIV3.Document {
               description:
                 "Category to budget for. Omit or set null for an overall budget across all expenses.",
             },
+            income_id: {
+              type: "string",
+              nullable: true,
+              description:
+                "Income source to link this budget to. Optional - budgets can be created without linking to income.",
+            },
             amount: { type: "number", minimum: 0, exclusiveMinimum: true },
             period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
             start_date: {
@@ -1615,6 +1626,8 @@ export function getApiDocs(): OpenAPIV3.Document {
           type: "object",
           properties: {
             amount: { type: "number", minimum: 0, exclusiveMinimum: true },
+            category_id: { type: "string", nullable: true },
+            income_id: { type: "string", nullable: true },
             period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
             start_date: { type: "string", format: "date-time" },
           },

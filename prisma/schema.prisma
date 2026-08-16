@@ -73,6 +73,8 @@ model Transaction {
   income      Transaction?    @relation("IncomeExpenses", fields: [income_id], references: [id])
   expenses    Transaction[]   @relation("IncomeExpenses")
 
+  budgets     Budget[]
+
   source_name String?
   notes       String?
   receipt_url String?
@@ -173,6 +175,8 @@ model Budget {
   user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   category_id String?
   category    Category?    @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  income_id   String?
+  income      Transaction? @relation(fields: [income_id], references: [id], onDelete: SetNull)
   amount      Decimal      @db.Decimal(12, 2)
   period      BudgetPeriod @default(MONTHLY)
   start_date  DateTime
@@ -181,7 +185,7 @@ model Budget {
   created_at  DateTime     @default(now())
   updated_at  DateTime     @updatedAt
 
-  @@unique([user_id, category_id, period])
+  @@unique([user_id, category_id, income_id, period])
   @@map("budgets")
 }
 
