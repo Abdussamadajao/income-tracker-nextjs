@@ -112,6 +112,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
       prevIncome,
       prevExpenses,
       topIncomeSources,
+      budgets,
     ] = await Promise.all([
       prisma.transaction.groupBy({
         by: ["category_id"],
@@ -186,6 +187,18 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
         orderBy: { amount: "desc" },
         take: 5,
       }),
+      prisma.budget.findMany({
+        where: {
+          user_id: user.id,
+          is_archived: false,
+        },
+        include: {
+          category: {
+            select: { id: true, name: true, icon: true, color: true },
+          },
+        },
+        orderBy: { created_at: "desc" },
+      }),
     ]);
 
     const categoryIds = [
@@ -199,6 +212,31 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
     });
 
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
+
+    const spendingMap = new Map(
+      spendingByCategory.map((s) => [s.category_id, toNum(s._sum.amount ?? 0)]),
+    );
+
+    const budgetData = budgets.map((budget) => {
+      const spent = budget.category_id
+        ? (spendingMap.get(budget.category_id) ?? 0)
+        : 0;
+      const budgetAmount = toNum(budget.amount);
+      const remaining = budgetAmount - spent;
+      const percentage =
+        budgetAmount > 0 ? Math.round((spent / budgetAmount) * 100) : 0;
+      return {
+        id: budget.id,
+        category: budget.category,
+        amount: budgetAmount,
+        spent,
+        remaining,
+        percentage,
+        period: budget.period,
+        start_date: budget.start_date,
+        is_over_budget: spent > budgetAmount,
+      };
+    });
 
     const currIncomeTotal = toNum(currentIncome._sum.amount ?? 0);
     const currExpenseTotal = toNum(currentExpenses._sum.amount ?? 0);
@@ -307,6 +345,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
         spending_by_category: spendingSlices,
         income_by_category: incomeSlices,
         income_sources: incomeSources,
+        budgets: budgetData,
         observations,
       },
     });

@@ -43,6 +43,8 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
       periodExpenses,
       recentTransactions,
       chartData,
+      budgets,
+      spendingByCategory,
     ] = await Promise.all([
       prisma.transaction.aggregate({
         where: { user_id: user.id, type: "INCOME" },
@@ -87,6 +89,29 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
         _sum: { amount: true },
         orderBy: { recorded_at: "asc" },
       }),
+      // Fetch active budgets
+      prisma.budget.findMany({
+        where: {
+          user_id: user.id,
+          is_archived: false,
+        },
+        include: {
+          category: {
+            select: { id: true, name: true, icon: true, color: true },
+          },
+        },
+        orderBy: { created_at: "desc" },
+      }),
+      // Get spending by category for the period
+      prisma.transaction.groupBy({
+        by: ["category_id"],
+        where: {
+          user_id: user.id,
+          type: "EXPENSE",
+          recorded_at: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
     const totalIncome = toNum(allIncome._sum.amount ?? 0);
@@ -130,6 +155,40 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, values]) => ({ date, ...values }));
 
+    // Process budget data
+    const spendingMap = new Map(
+      spendingByCategory.map((s) => [s.category_id, toNum(s._sum.amount ?? 0)]),
+    );
+
+    const budgetData = budgets.map((budget) => {
+      const spent = budget.category_id
+        ? (spendingMap.get(budget.category_id) ?? 0)
+        : 0;
+      const budgetAmount = toNum(budget.amount);
+      const remaining = budgetAmount - spent;
+      const percentage =
+        budgetAmount > 0 ? Math.round((spent / budgetAmount) * 100) : 0;
+
+      return {
+        id: budget.id,
+        category: budget.category,
+        amount: budgetAmount,
+        spent,
+        remaining,
+        percentage,
+        period: budget.period,
+        start_date: budget.start_date,
+        is_over_budget: spent > budgetAmount,
+      };
+    });
+
+    // Calculate total budget overview
+    const totalBudget = budgetData.reduce((sum, b) => sum + b.amount, 0);
+    const totalBudgetSpent = budgetData.reduce((sum, b) => sum + b.spent, 0);
+    const totalBudgetRemaining = totalBudget - totalBudgetSpent;
+    const overallBudgetPercentage =
+      totalBudget > 0 ? Math.round((totalBudgetSpent / totalBudget) * 100) : 0;
+
     return NextResponse.json({
       data: {
         net_worth: {
@@ -148,6 +207,16 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
         },
         recent,
         chart,
+        budgets: {
+          items: budgetData,
+          summary: {
+            total_budget: totalBudget,
+            total_spent: totalBudgetSpent,
+            total_remaining: totalBudgetRemaining,
+            overall_percentage: overallBudgetPercentage,
+            is_overall_over_budget: totalBudgetSpent > totalBudget,
+          },
+        },
       },
     });
   } catch (err) {

@@ -871,7 +871,7 @@ export function getApiDocs(): OpenAPIV3.Document {
           tags: ["Dashboard"],
           summary: "Get dashboard summary",
           description:
-            "Returns net worth, period totals (income, expenses, savings, savings rate), recent transactions, and daily chart data.",
+            "Returns net worth, period totals (income, expenses, savings, savings rate), recent transactions, daily chart data, and budget utilization.",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -910,7 +910,7 @@ export function getApiDocs(): OpenAPIV3.Document {
           tags: ["Insights"],
           summary: "Get financial insights",
           description:
-            "Returns period-over-period comparisons, spending/income breakdowns by category, top income sources, and generated observations.",
+            "Returns period-over-period comparisons, spending/income breakdowns by category, top income sources, budget utilization, and generated observations.",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -1657,6 +1657,17 @@ export function getApiDocs(): OpenAPIV3.Document {
                 },
               },
             },
+            budgets: {
+              type: "object",
+              description: "Budget data for the current period",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/DashboardBudgetItem" },
+                },
+                summary: { $ref: "#/components/schemas/BudgetSummary" },
+              },
+            },
           },
         },
         RecentTransaction: {
@@ -1669,6 +1680,39 @@ export function getApiDocs(): OpenAPIV3.Document {
             recorded_at: { type: "string", format: "date-time" },
             category: { $ref: "#/components/schemas/CategoryBrief" },
             isIncome: { type: "boolean" },
+          },
+        },
+        DashboardBudgetItem: {
+          type: "object",
+          description:
+            "Budget item with spending calculation for the current period",
+          properties: {
+            id: { type: "string" },
+            category: { $ref: "#/components/schemas/CategoryBrief" },
+            amount: { type: "number", description: "Budgeted amount" },
+            spent: {
+              type: "number",
+              description: "Amount spent in the period",
+            },
+            remaining: { type: "number", description: "Remaining budget" },
+            percentage: {
+              type: "integer",
+              description: "Percentage of budget used",
+            },
+            period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
+            start_date: { type: "string", format: "date-time" },
+            is_over_budget: { type: "boolean" },
+          },
+        },
+        BudgetSummary: {
+          type: "object",
+          description: "Overall budget summary across all budgets",
+          properties: {
+            total_budget: { type: "number" },
+            total_spent: { type: "number" },
+            total_remaining: { type: "number" },
+            overall_percentage: { type: "integer" },
+            is_overall_over_budget: { type: "boolean" },
           },
         },
         InsightsData: {
@@ -1717,6 +1761,10 @@ export function getApiDocs(): OpenAPIV3.Document {
             observations: {
               type: "array",
               items: { type: "string" },
+            },
+            budgets: {
+              type: "array",
+              items: { $ref: "#/components/schemas/DashboardBudgetItem" },
             },
           },
         },
