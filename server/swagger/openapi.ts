@@ -7,7 +7,7 @@ export function getApiDocs(): OpenAPIV3.Document {
       title: "Income Tracker API",
       version: "1.0.0",
       description:
-        "REST API for the Income Tracker application. Manages transactions, categories, notifications, and user profiles.",
+        "REST API for the Income Tracker application. Manages transactions, categories, budgets, notifications, and user profiles.",
     },
     servers: [{ url: "/api", description: "API base path" }],
     tags: [
@@ -16,6 +16,7 @@ export function getApiDocs(): OpenAPIV3.Document {
       { name: "Admin", description: "Admin-only endpoints" },
       { name: "Categories", description: "Transaction categories" },
       { name: "Transactions", description: "Income and expense transactions" },
+      { name: "Budgets", description: "Category and overall spending budgets" },
       { name: "Dashboard", description: "Dashboard summary data" },
       { name: "Insights", description: "Financial insights and analytics" },
       { name: "Notifications", description: "User notifications" },
@@ -69,7 +70,8 @@ export function getApiDocs(): OpenAPIV3.Document {
         get: {
           tags: ["Admin"],
           summary: "List all users",
-          description: "Returns up to 50 users ordered by creation date. Requires ADMIN role.",
+          description:
+            "Returns up to 50 users ordered by creation date. Requires ADMIN role.",
           security: [{ bearerAuth: [] }],
           responses: {
             "200": {
@@ -178,7 +180,8 @@ export function getApiDocs(): OpenAPIV3.Document {
         get: {
           tags: ["Categories"],
           summary: "Get category by ID",
-          description: "Returns a system category or a category owned by the user.",
+          description:
+            "Returns a system category or a category owned by the user.",
           security: [{ bearerAuth: [] }],
           parameters: [{ $ref: "#/components/parameters/IdParam" }],
           responses: {
@@ -313,7 +316,8 @@ export function getApiDocs(): OpenAPIV3.Document {
             {
               name: "q",
               in: "query",
-              description: "Search across source_name, notes, and category name",
+              description:
+                "Search across source_name, notes, and category name",
               schema: { type: "string" },
             },
             { $ref: "#/components/parameters/PageParam" },
@@ -398,6 +402,82 @@ export function getApiDocs(): OpenAPIV3.Document {
                               requested: { type: "number" },
                             },
                           },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+      },
+      "/transactions/batch": {
+        post: {
+          tags: ["Transactions"],
+          summary: "Create multiple transactions",
+          description:
+            "Creates up to 20 income and/or expense transactions in a single atomic request. Validates category ownership/type and cumulative income-source balance across the whole batch (multiple expenses drawing from the same income source cannot collectively overspend it). Triggers a transaction-added notification per item and a single low-balance check per affected income source.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/CreateTransactionsBatchBody",
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Transactions created",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Transaction" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": { $ref: "#/components/responses/BadRequest" },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "403": { $ref: "#/components/responses/Forbidden" },
+            "404": {
+              description:
+                "A category or income source referenced in the batch was not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "422": {
+              description:
+                "Insufficient cumulative balance on a linked income source, or request body failed validation",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/Error" },
+                      {
+                        type: "object",
+                        properties: {
+                          details: {
+                            type: "object",
+                            properties: {
+                              remaining: { type: "number" },
+                              requested: { type: "number" },
+                            },
+                          },
+                          issues: { type: "object" },
                         },
                       },
                     ],
@@ -538,6 +618,248 @@ export function getApiDocs(): OpenAPIV3.Document {
             "401": { $ref: "#/components/responses/Unauthorized" },
             "403": { $ref: "#/components/responses/Forbidden" },
             "404": { $ref: "#/components/responses/NotFound" },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+      },
+
+      // ─── Budgets ─────────────────────────────────────────────────────────
+      "/budgets": {
+        post: {
+          tags: ["Budgets"],
+          summary: "Create budget(s)",
+          description:
+            "Creates up to 20 budgets in a single atomic request. Each budget targets a specific category or, when category_id is null, an overall spending budget across all expenses. A user may have at most one active (non-archived) budget per category/period combination.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateBudgetsBatchBody" },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Budgets created",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Budget" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": { $ref: "#/components/responses/BadRequest" },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "409": {
+              description:
+                "An active budget for this category and period already exists",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "422": {
+              description: "Request body failed validation",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/Error" },
+                      {
+                        type: "object",
+                        properties: { issues: { type: "object" } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+      },
+      "/budgets/{id}": {
+        put: {
+          tags: ["Budgets"],
+          summary: "Update budget",
+          description:
+            "Updates amount, period, and/or start_date on an active budget. Archived budgets cannot be updated.",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: "#/components/parameters/IdParam" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateBudgetBody" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Budget updated",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: { $ref: "#/components/schemas/Budget" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Invalid request, or budget is archived",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "403": { $ref: "#/components/responses/Forbidden" },
+            "404": { $ref: "#/components/responses/NotFound" },
+            "422": {
+              description: "Request body failed validation",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/Error" },
+                      {
+                        type: "object",
+                        properties: { issues: { type: "object" } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+        delete: {
+          tags: ["Budgets"],
+          summary: "Delete budget",
+          description:
+            "Permanently deletes a budget. This is a hard delete with no recovery — use POST /budgets/{id}/archive instead to preserve historical record.",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: "#/components/parameters/IdParam" }],
+          responses: {
+            "200": {
+              description: "Budget deleted",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string" },
+                          deleted: { type: "boolean", example: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "403": { $ref: "#/components/responses/Forbidden" },
+            "404": { $ref: "#/components/responses/NotFound" },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+      },
+      "/budgets/{id}/archive": {
+        post: {
+          tags: ["Budgets"],
+          summary: "Archive budget",
+          description:
+            "Soft-deletes a budget, preserving its historical record while freeing up its category/period slot for a new active budget.",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: "#/components/parameters/IdParam" }],
+          responses: {
+            "200": {
+              description: "Budget archived",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: { $ref: "#/components/schemas/Budget" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Budget is already archived",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "403": { $ref: "#/components/responses/Forbidden" },
+            "404": { $ref: "#/components/responses/NotFound" },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
+      },
+      "/budgets/{id}/restore": {
+        post: {
+          tags: ["Budgets"],
+          summary: "Restore archived budget",
+          description:
+            "Un-archives a previously archived budget. Fails with 409 if an active budget now occupies the same category/period slot.",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: "#/components/parameters/IdParam" }],
+          responses: {
+            "200": {
+              description: "Budget restored",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: { $ref: "#/components/schemas/Budget" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Budget is not archived",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "403": { $ref: "#/components/responses/Forbidden" },
+            "404": { $ref: "#/components/responses/NotFound" },
+            "409": {
+              description:
+                "An active budget already exists for this category and period",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
             "500": { $ref: "#/components/responses/InternalServerError" },
           },
         },
@@ -748,7 +1070,8 @@ export function getApiDocs(): OpenAPIV3.Document {
         post: {
           tags: ["Notifications"],
           summary: "Register push notification token",
-          description: "Upserts a push notification token for the authenticated user.",
+          description:
+            "Upserts a push notification token for the authenticated user.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -1181,7 +1504,8 @@ export function getApiDocs(): OpenAPIV3.Document {
             category_id: { type: "string" },
             income_id: {
               type: "string",
-              description: "Link expense to an income source for budget tracking",
+              description:
+                "Link expense to an income source for budget tracking",
             },
             source_name: { type: "string" },
             notes: { type: "string" },
@@ -1191,6 +1515,18 @@ export function getApiDocs(): OpenAPIV3.Document {
               type: "string",
               format: "date-time",
               description: "Date the transaction was recorded (ISO 8601)",
+            },
+          },
+        },
+        CreateTransactionsBatchBody: {
+          type: "object",
+          required: ["transactions"],
+          properties: {
+            transactions: {
+              type: "array",
+              minItems: 1,
+              maxItems: 20,
+              items: { $ref: "#/components/schemas/CreateTransactionBody" },
             },
           },
         },
@@ -1209,6 +1545,78 @@ export function getApiDocs(): OpenAPIV3.Document {
               nullable: true,
             },
             recorded_at: { type: "string", format: "date-time" },
+          },
+        },
+        Budget: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            user_id: { type: "string" },
+            category_id: { type: "string", nullable: true },
+            category: {
+              nullable: true,
+              allOf: [{ $ref: "#/components/schemas/CategoryBrief" }],
+            },
+            amount: { type: "number", format: "double" },
+            period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
+            start_date: { type: "string", format: "date-time" },
+            is_archived: { type: "boolean" },
+            archived_at: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+            },
+            spent: {
+              type: "number",
+              description:
+                "Sum of matching expenses within the current period window",
+            },
+            remaining: { type: "number" },
+            percent_used: { type: "number" },
+            period_start: { type: "string", format: "date-time" },
+            period_end: { type: "string", format: "date-time" },
+            created_at: { type: "string", format: "date-time" },
+            updated_at: { type: "string", format: "date-time" },
+          },
+        },
+        CreateBudgetBody: {
+          type: "object",
+          required: ["amount", "period", "start_date"],
+          properties: {
+            category_id: {
+              type: "string",
+              nullable: true,
+              description:
+                "Category to budget for. Omit or set null for an overall budget across all expenses.",
+            },
+            amount: { type: "number", minimum: 0, exclusiveMinimum: true },
+            period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
+            start_date: {
+              type: "string",
+              format: "date-time",
+              description:
+                "Anchor date used to compute the recurring period window (ISO 8601)",
+            },
+          },
+        },
+        CreateBudgetsBatchBody: {
+          type: "object",
+          required: ["budgets"],
+          properties: {
+            budgets: {
+              type: "array",
+              minItems: 1,
+              maxItems: 20,
+              items: { $ref: "#/components/schemas/CreateBudgetBody" },
+            },
+          },
+        },
+        UpdateBudgetBody: {
+          type: "object",
+          properties: {
+            amount: { type: "number", minimum: 0, exclusiveMinimum: true },
+            period: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
+            start_date: { type: "string", format: "date-time" },
           },
         },
         DashboardSummary: {

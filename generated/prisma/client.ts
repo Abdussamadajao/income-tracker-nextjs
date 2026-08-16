@@ -81,3 +81,8 @@ export type Account = Prisma.AccountModel
  * 
  */
 export type Verification = Prisma.VerificationModel
+/**
+ * Model Budget
+ * 
+ */
+export type Budget = Prisma.BudgetModel

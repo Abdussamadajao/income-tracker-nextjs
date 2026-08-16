@@ -13,6 +13,10 @@ export interface CreateTransactionBody {
   recorded_at: string;
 }
 
+export interface CreateTransactionsBatchBody {
+  transactions: CreateTransactionBody[];
+}
+
 export interface UpdateTransactionBody {
   amount?: number;
   category_id?: string;
