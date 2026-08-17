@@ -45,6 +45,15 @@ const transactionInclude = {
     select: expenseSelect,
     orderBy: { recorded_at: "desc" as const },
   },
+  budget: {
+    select: {
+      id: true,
+      amount: true,
+      period: true,
+      category: { select: categorySelect },
+      income: { select: incomeSelect },
+    },
+  },
 } as const;
 
 function toNumber(value: DecimalType | string | number): number {
@@ -180,7 +189,10 @@ export const POST = withAuth(async (req, { user }) => {
     });
 
     if (!category) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 },
+      );
     }
 
     if (category.type !== body.type) {
@@ -232,6 +244,24 @@ export const POST = withAuth(async (req, { user }) => {
       }
     }
 
+    // Validate budget_id if provided
+    if (body.budget_id) {
+      const budget = await prisma.budget.findFirst({
+        where: {
+          id: body.budget_id,
+          user_id: user.id,
+          is_archived: false,
+        },
+      });
+
+      if (!budget) {
+        return NextResponse.json(
+          { error: "Budget not found or is archived" },
+          { status: 404 },
+        );
+      }
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         type: body.type,
@@ -239,6 +269,7 @@ export const POST = withAuth(async (req, { user }) => {
         category_id: body.category_id,
         user_id: user.id,
         income_id: body.type === "EXPENSE" ? (body.income_id ?? null) : null,
+        budget_id: body.type === "EXPENSE" ? (body.budget_id ?? null) : null,
         source_name: body.source_name ?? null,
         notes: body.notes ?? null,
         receipt_url: body.receipt_url ?? null,

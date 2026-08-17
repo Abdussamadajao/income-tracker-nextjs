@@ -1436,6 +1436,11 @@ export function getApiDocs(): OpenAPIV3.Document {
             category_id: { type: "string" },
             user_id: { type: "string" },
             income_id: { type: "string", nullable: true },
+            budget_id: { type: "string", nullable: true },
+            budget: {
+              nullable: true,
+              allOf: [{ $ref: "#/components/schemas/Budget" }],
+            },
             source_name: { type: "string", nullable: true },
             notes: { type: "string", nullable: true },
             receipt_url: { type: "string", nullable: true },
@@ -1507,6 +1512,12 @@ export function getApiDocs(): OpenAPIV3.Document {
               description:
                 "Link expense to an income source for budget tracking",
             },
+            budget_id: {
+              type: "string",
+              nullable: true,
+              description:
+                "Link expense to a budget to track spending against budget allocation",
+            },
             source_name: { type: "string" },
             notes: { type: "string" },
             receipt_url: { type: "string" },
@@ -1536,6 +1547,7 @@ export function getApiDocs(): OpenAPIV3.Document {
             amount: { type: "number", minimum: 0, exclusiveMinimum: true },
             category_id: { type: "string" },
             income_id: { type: "string", nullable: true },
+            budget_id: { type: "string", nullable: true },
             source_name: { type: "string" },
             notes: { type: "string" },
             receipt_url: { type: "string" },

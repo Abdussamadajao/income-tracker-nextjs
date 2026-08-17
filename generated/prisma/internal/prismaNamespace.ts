@@ -1172,6 +1172,7 @@ export const TransactionScalarFieldEnum = {
   category_id: 'category_id',
   user_id: 'user_id',
   income_id: 'income_id',
+  budget_id: 'budget_id',
   source_name: 'source_name',
   notes: 'notes',
   receipt_url: 'receipt_url',

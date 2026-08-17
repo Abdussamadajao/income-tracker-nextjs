@@ -19,6 +19,9 @@ function getDateRange(period: string): { from: Date; to: Date } {
     case "week":
       from.setDate(now.getDate() - 7);
       break;
+    case "3m":
+      from.setMonth(now.getMonth() - 3);
+      break;
     case "year":
       from.setFullYear(now.getFullYear() - 1);
       break;
