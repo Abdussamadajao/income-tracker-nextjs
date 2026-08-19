@@ -625,6 +625,59 @@ export function getApiDocs(): OpenAPIV3.Document {
 
       // ─── Budgets ─────────────────────────────────────────────────────────
       "/budgets": {
+        get: {
+          tags: ["Budgets"],
+          summary: "Get all budgets",
+          description:
+            "Retrieve all budgets for the authenticated user with optional filters. Returns budget data with calculated spent amounts and period boundaries.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "period",
+              schema: { type: "string", enum: ["WEEKLY", "MONTHLY", "YEARLY"] },
+              description: "Filter by budget period",
+            },
+            {
+              in: "query",
+              name: "category_id",
+              schema: { type: "string" },
+              description: "Filter by category ID",
+            },
+            {
+              in: "query",
+              name: "income_id",
+              schema: { type: "string" },
+              description: "Filter by income transaction ID",
+            },
+            {
+              in: "query",
+              name: "archived",
+              schema: { type: "string", enum: ["true", "false"] },
+              description: "Filter by archived status",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "List of budgets with spending data",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Budget" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
         post: {
           tags: ["Budgets"],
           summary: "Create budget(s)",

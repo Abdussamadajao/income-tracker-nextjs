@@ -2,9 +2,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@/server/require-auth";
-import { prisma } from "@/server/prisma";
+import { prisma, Decimal } from "@/server/prisma";
 import { authLogger } from "@/server/log";
 import type { Prisma } from "@/generated/prisma/client";
+
+type DecimalType = InstanceType<typeof Decimal>;
+
+function toNumber(value: DecimalType | string | number): number {
+  if (value instanceof Decimal) return value.toNumber();
+  return Number(value);
+}
 
 const budgetItemSchema = z.object({
   category_id: z.string().nullable().default(null),
@@ -16,6 +23,95 @@ const budgetItemSchema = z.object({
 
 const bodySchema = z.object({
   budgets: z.array(budgetItemSchema).min(1).max(20),
+});
+
+export const GET = withAuth(async (req: NextRequest, { user }) => {
+  const sp = req.nextUrl.searchParams;
+  const period = sp.get("period");
+  const category_id = sp.get("category_id");
+  const income_id = sp.get("income_id");
+  const archived = sp.get("archived");
+
+  try {
+    const where: Prisma.BudgetWhereInput = {
+      user_id: user.id,
+      ...(period && { period: period as "WEEKLY" | "MONTHLY" | "YEARLY" }),
+      ...(category_id && { category_id }),
+      ...(income_id && { income_id }),
+      ...(archived === "true" && { is_archived: true }),
+      ...(archived === "false" && { is_archived: false }),
+    };
+
+    const budgets = await prisma.budget.findMany({
+      where,
+      include: {
+        category: true,
+        income: true,
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    // Calculate spent amounts for each budget based on current period
+    const enriched = await Promise.all(
+      budgets.map(async (budget) => {
+        const now = new Date();
+
+        // Calculate period boundaries based on budget period
+        let start: Date;
+        let end: Date;
+
+        if (budget.period === "WEEKLY") {
+          start = new Date(now);
+          start.setDate(now.getDate() - now.getDay());
+          start.setHours(0, 0, 0, 0);
+          end = new Date(start);
+          end.setDate(start.getDate() + 7);
+        } else if (budget.period === "MONTHLY") {
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+          end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        } else {
+          // YEARLY
+          start = new Date(now.getFullYear(), 0, 1);
+          end = new Date(now.getFullYear() + 1, 0, 1);
+        }
+
+        const where: Prisma.TransactionWhereInput = {
+          user_id: user.id,
+          type: "EXPENSE",
+          recorded_at: { gte: start, lt: end },
+          budget_id: budget.id,
+        };
+
+        const result = await prisma.transaction.aggregate({
+          where,
+          _sum: { amount: true },
+        });
+
+        const spent = toNumber(result._sum.amount ?? 0);
+        const budgetAmount = toNumber(budget.amount);
+        const remaining = budgetAmount - spent;
+        const percent_used =
+          budgetAmount > 0 ? Math.round((spent / budgetAmount) * 100) : 0;
+
+        return {
+          ...budget,
+          spent,
+          remaining,
+          percent_used,
+          period_start: start.toISOString(),
+          period_end: end.toISOString(),
+        };
+      }),
+    );
+
+    return NextResponse.json({ data: enriched });
+  } catch (err) {
+    authLogger.error({ err, userId: user.id }, "Failed to fetch budgets");
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
 });
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
