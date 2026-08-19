@@ -741,6 +741,40 @@ export function getApiDocs(): OpenAPIV3.Document {
         },
       },
       "/budgets/{id}": {
+        get: {
+          tags: ["Budgets"],
+          summary: "Get budget by ID",
+          description:
+            "Retrieve a single budget with calculated spent amounts and period boundaries.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Budget ID",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Budget with spending data",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      data: { $ref: "#/components/schemas/Budget" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+            "404": { $ref: "#/components/responses/NotFound" },
+            "500": { $ref: "#/components/responses/InternalServerError" },
+          },
+        },
         put: {
           tags: ["Budgets"],
           summary: "Update budget",

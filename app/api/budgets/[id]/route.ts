@@ -123,6 +123,83 @@ export const PUT = withAuth(
   },
 );
 
+export const GET = withAuth(
+  async (
+    req: NextRequest,
+    { user, params }: { user: { id: string }; params: { id: string } },
+  ) => {
+    try {
+      const budget = await prisma.budget.findUnique({
+        where: { id: params.id },
+        include: { category: true, income: true },
+      });
+
+      if (!budget || budget.user_id !== user.id) {
+        return NextResponse.json(
+          { error: "Budget not found" },
+          { status: 404 },
+        );
+      }
+
+      // Calculate spent amount for current period
+      const now = new Date();
+      let start: Date;
+      let end: Date;
+
+      if (budget.period === "WEEKLY") {
+        start = new Date(now);
+        start.setDate(now.getDate() - now.getDay());
+        start.setHours(0, 0, 0, 0);
+        end = new Date(start);
+        end.setDate(start.getDate() + 7);
+      } else if (budget.period === "MONTHLY") {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      } else {
+        // YEARLY
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear() + 1, 0, 1);
+      }
+
+      const result = await prisma.transaction.aggregate({
+        where: {
+          user_id: user.id,
+          type: "EXPENSE",
+          recorded_at: { gte: start, lt: end },
+          budget_id: budget.id,
+        },
+        _sum: { amount: true },
+      });
+
+      const spent = result._sum.amount ? Number(result._sum.amount) : 0;
+      const budgetAmount = Number(budget.amount);
+      const remaining = budgetAmount - spent;
+      const percent_used =
+        budgetAmount > 0 ? Math.round((spent / budgetAmount) * 100) : 0;
+
+      const enriched = {
+        ...budget,
+        spent,
+        remaining,
+        percent_used,
+        period_start: start.toISOString(),
+        period_end: end.toISOString(),
+      };
+
+      return NextResponse.json({ data: enriched });
+    } catch (err) {
+      authLogger.error(
+        { err, userId: user.id, budgetId: params.id },
+        "Failed to fetch budget",
+      );
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      );
+    }
+  },
+);
+
 export const DELETE = withAuth(
   async (
     req: NextRequest,
