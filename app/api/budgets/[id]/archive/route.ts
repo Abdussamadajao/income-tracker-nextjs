@@ -6,42 +6,55 @@ import { authLogger } from "@/server/log";
 export const POST = withAuth(
   async (
     req: NextRequest,
-    { user, params }: { user: { id: string }; params: { id: string } },
+    { user, params }: { user: { id: string }; params: Promise<{ id: string }> },
   ) => {
+    const { id } = await params;
+
     const existing = await prisma.budget.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing || existing.user_id !== user.id) {
-      return NextResponse.json({ error: "Budget not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Budget not found",
+          message: "This budget does not exist or you don't have access to it.",
+        },
+        { status: 404 },
+      );
     }
 
     if (existing.is_archived) {
       return NextResponse.json(
-        { error: "Budget is already archived" },
+        {
+          error: "Budget already archived",
+          message: "This budget has already been archived.",
+        },
         { status: 400 },
       );
     }
 
     try {
       const archived = await prisma.budget.update({
-        where: { id: params.id },
+        where: { id },
         data: { is_archived: true, archived_at: new Date() },
         include: { category: true },
       });
 
-      authLogger.info(
-        { userId: user.id, budgetId: params.id },
-        "Budget archived",
-      );
+      authLogger.info({ userId: user.id, budgetId: id }, "Budget archived");
+
       return NextResponse.json({ data: archived });
     } catch (err) {
       authLogger.error(
-        { err, userId: user.id, budgetId: params.id },
+        { err, userId: user.id, budgetId: id },
         "Failed to archive budget",
       );
       return NextResponse.json(
-        { error: "Internal server error" },
+        {
+          error: "Internal server error",
+          message:
+            "Something went wrong while archiving this budget. Please try again.",
+        },
         { status: 500 },
       );
     }
