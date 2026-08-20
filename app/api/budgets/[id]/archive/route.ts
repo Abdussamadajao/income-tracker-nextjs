@@ -6,9 +6,9 @@ import { authLogger } from "@/server/log";
 export const POST = withAuth(
   async (
     req: NextRequest,
-    { user, params }: { user: { id: string }; params: Promise<{ id: string }> },
+    { user, params }: { user: { id: string }; params: { id: string } },
   ) => {
-    const { id } = await params;
+    const { id } = params;
 
     const existing = await prisma.budget.findUnique({
       where: { id },
@@ -42,7 +42,6 @@ export const POST = withAuth(
       });
 
       authLogger.info({ userId: user.id, budgetId: id }, "Budget archived");
-
       return NextResponse.json({ data: archived });
     } catch (err) {
       authLogger.error(

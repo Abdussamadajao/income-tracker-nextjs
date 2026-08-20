@@ -6,9 +6,9 @@ import { authLogger } from "@/server/log";
 export const POST = withAuth(
   async (
     req: NextRequest,
-    { user, params }: { user: { id: string }; params: Promise<{ id: string }> },
+    { user, params }: { user: { id: string }; params: { id: string } },
   ) => {
-    const { id } = await params;
+    const { id } = params;
 
     const existing = await prisma.budget.findUnique({
       where: { id },
@@ -35,9 +35,6 @@ export const POST = withAuth(
     }
 
     try {
-      // restoring can collide with an active budget that now occupies the
-      // same category+period slot — the partial unique index will reject
-      // this at the DB level, so surface that as a clean 409 instead of 500
       const restored = await prisma.budget.update({
         where: { id },
         data: { is_archived: false, archived_at: null },
@@ -45,7 +42,6 @@ export const POST = withAuth(
       });
 
       authLogger.info({ userId: user.id, budgetId: id }, "Budget restored");
-
       return NextResponse.json({ data: restored });
     } catch (err) {
       const prismaErr = err as { code?: string };
@@ -65,7 +61,6 @@ export const POST = withAuth(
         { err, userId: user.id, budgetId: id },
         "Failed to restore budget",
       );
-
       return NextResponse.json(
         {
           error: "Internal server error",
