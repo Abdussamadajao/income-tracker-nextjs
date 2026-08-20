@@ -81,7 +81,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
           },
         },
         orderBy: { recorded_at: "desc" },
-        take: 10,
+        take: 3,
       }),
       prisma.transaction.groupBy({
         by: ["recorded_at", "type"],
