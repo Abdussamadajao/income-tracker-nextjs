@@ -81,6 +81,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
   const amountMin = sp.get("amountMin");
   const amountMax = sp.get("amountMax");
   const income_id = sp.get("income_id");
+  const budget_id = sp.get("budget_id");
   const q = sp.get("q");
   const page = sp.get("page") ?? "1";
   const pageSize = sp.get("pageSize") ?? "20";
@@ -94,6 +95,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
 
       ...(type && { type: type as "INCOME" | "EXPENSE" }),
       ...(income_id && { income_id }),
+      ...(budget_id && { budget_id }),
 
       ...((from || to) && {
         recorded_at: {
