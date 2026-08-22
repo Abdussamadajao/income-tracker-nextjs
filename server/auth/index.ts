@@ -33,7 +33,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     requireEmailVerification: true,
     sendResetPassword: betterAuthEmails.resetPassword,
-    resetPasswordTokenExpiresIn: 60 * 60,
+    resetPasswordTokenExpiresIn: 60 * 10,
   },
 
   emailVerification: {
