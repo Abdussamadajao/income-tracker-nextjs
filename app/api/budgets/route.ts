@@ -98,13 +98,29 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
           spent,
           remaining,
           percent_used,
+          is_over_budget: spent > budgetAmount,
           period_start: start.toISOString(),
           period_end: end.toISOString(),
         };
       }),
     );
 
-    return NextResponse.json({ data: enriched });
+    // Roll up the same summary shape used by the dashboard's budgets section
+    const total_budget = enriched.reduce((sum, b) => sum + toNumber(b.amount), 0);
+    const total_spent = enriched.reduce((sum, b) => sum + b.spent, 0);
+    const total_remaining = total_budget - total_spent;
+    const overall_percentage =
+      total_budget > 0 ? Math.round((total_spent / total_budget) * 100) : 0;
+
+    const summary = {
+      total_budget,
+      total_spent,
+      total_remaining,
+      overall_percentage,
+      is_overall_over_budget: total_spent > total_budget,
+    };
+
+    return NextResponse.json({ data: enriched, summary });
   } catch (err) {
     authLogger.error({ err, userId: user.id }, "Failed to fetch budgets");
     return NextResponse.json(

@@ -182,6 +182,7 @@ export const GET = withAuth(
         spent,
         remaining,
         percent_used,
+        is_over_budget: spent > budgetAmount,
         period_start: start.toISOString(),
         period_end: end.toISOString(),
       };
