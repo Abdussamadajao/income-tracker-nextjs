@@ -12,6 +12,32 @@ const updateBudgetSchema = z.object({
   start_date: z.iso.datetime().optional(),
 });
 
+const categorySelect = {
+  id: true,
+  name: true,
+  icon: true,
+  color: true,
+  type: true,
+} as const;
+
+const budgetTransactionSelect = {
+  id: true,
+  type: true,
+  amount: true,
+  source_name: true,
+  notes: true,
+  tag: true,
+  recorded_at: true,
+  created_at: true,
+  category: { select: categorySelect },
+} as const;
+
+function getBudgetStatus(percentage: number): "healthy" | "warning" | "danger" {
+  if (percentage >= 100) return "danger";
+  if (percentage >= 80) return "warning";
+  return "healthy";
+}
+
 export const PUT = withAuth(
   async (
     req: NextRequest,
@@ -161,30 +187,59 @@ export const GET = withAuth(
         end = new Date(now.getFullYear() + 1, 0, 1);
       }
 
-      const result = await prisma.transaction.aggregate({
+      // Fetch the actual transactions tied to this budget within the period,
+      // instead of just the aggregate sum
+      const transactions = await prisma.transaction.findMany({
         where: {
           user_id: user.id,
           type: "EXPENSE",
-          recorded_at: { gte: start, lt: end },
           budget_id: budget.id,
+          recorded_at: { gte: start, lt: end },
         },
-        _sum: { amount: true },
+        select: budgetTransactionSelect,
+        orderBy: { recorded_at: "desc" },
       });
 
-      const spent = result._sum.amount ? Number(result._sum.amount) : 0;
+      const spent = transactions.reduce(
+        (sum, tx) => sum + Number(tx.amount),
+        0,
+      );
       const budgetAmount = Number(budget.amount);
       const remaining = budgetAmount - spent;
       const percent_used =
         budgetAmount > 0 ? Math.round((spent / budgetAmount) * 100) : 0;
 
+      const summary: {
+        id: string;
+        name: string;
+        icon: string;
+        total: number;
+        spent: number;
+        remaining: number;
+        percentage: number;
+        status: "healthy" | "warning" | "danger";
+      } = {
+        id: budget.id,
+        name: budget.category?.name ?? "Budget",
+        icon: budget.category?.icon ?? "account-balance-wallet",
+        total: budgetAmount,
+        spent,
+        remaining,
+        percentage: percent_used,
+        status: getBudgetStatus(percent_used),
+      };
+
       const enriched = {
         ...budget,
+        amount: budgetAmount,
+        transactions,
         spent,
         remaining,
         percent_used,
         is_over_budget: spent > budgetAmount,
         period_start: start.toISOString(),
         period_end: end.toISOString(),
+        summary,
       };
 
       return NextResponse.json({ data: enriched });
